@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Личный недельный планировщик с хранением данных в браузере.">
+  <title>Недельный планировщик</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="eyebrow">Личный планировщик</span>
+        <h1>План на неделю</h1>
+      </div>
+      <div class="week-controls" aria-label="Навигация по неделям">
+        <div class="week-heading">
+          <h2 id="week-range">Загрузка недели</h2>
+          <span id="week-context" class="muted"></span>
+        </div>
+        <div class="navigation">
+          <button id="previous-week" class="icon-button" aria-label="Предыдущая неделя" title="Предыдущая неделя">←</button>
+          <button id="current-week">текущая неделя</button>
+          <button id="next-week" class="icon-button" aria-label="Следующая неделя" title="Следующая неделя">→</button>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button id="add-task" class="primary" data-mutation>добавить задачу</button>
+        <button id="open-reports">отчёты</button>
+        <button id="open-help">справка</button>
+      </div>
+    </header>
+
+    <div class="statusbar">
+      <p>Планируйте неделю и отмечайте выполненное.</p>
+      <label class="hide-completed">
+        <input id="hide-completed" type="checkbox" data-mutation> скрыть выполненные
+      </label>
+    </div>
+    <div id="storage-message" class="storage-message" role="status" aria-live="polite"></div>
+    <button id="error-reset" hidden>сбросить данные планировщика</button>
+    <div id="action-message" class="action-message" role="status" aria-live="polite" hidden></div>
+    <div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
+
+    <div class="workspace">
+      <aside class="sidebar" aria-label="Библиотека и буфер задач">
+        <div class="tabs" role="tablist" aria-label="Списки задач">
+          <button id="buffer-tab" role="tab" aria-selected="true" aria-controls="buffer-panel" tabindex="0">буфер <span id="buffer-count" class="count">0</span></button>
+          <button id="library-tab" role="tab" aria-selected="false" aria-controls="library-panel" tabindex="-1">библиотека <span id="library-count" class="count">0</span></button>
+        </div>
+        <section id="buffer-panel" class="side-panel" role="tabpanel" aria-labelledby="buffer-tab" tabindex="0">
+          <label class="search-label" for="buffer-search">поиск в буфере</label><input id="buffer-search" type="search" placeholder="название задачи">
+          <h3>нераспределённые <span id="unplanned-count" class="count">0</span></h3>
+          <p class="empty-copy" id="unplanned-copy">Здесь будут задачи, для которых ещё не выбраны день и время.</p>
+          <div id="unplanned-list" class="side-list"></div>
+          <h3>просроченные <span id="overdue-count" class="count">0</span></h3>
+          <p class="empty-copy" id="overdue-copy">Невыполненные задачи появятся здесь после окончания дня срока.</p>
+          <div id="overdue-list" class="side-list"></div>
+          <button id="load-demo" data-mutation hidden>загрузить примеры</button>
+          <div class="side-note">Буфер помогает распределять задачи. Перенос выполняется вручную, по одной задаче.</div>
+        </section>
+        <section id="library-panel" class="side-panel" role="tabpanel" aria-labelledby="library-tab" tabindex="0" hidden>
+          <label class="search-label" for="library-search">поиск в библиотеке</label><input id="library-search" type="search" placeholder="название задачи">
+          <h3>мои задачи</h3>
+          <p class="empty-copy" id="library-copy">Сохраните здесь задачи, которые нужны регулярно. Каждое добавление в план будет независимым.</p>
+          <div id="library-list" class="side-list"></div>
+          <button id="add-library" data-mutation>добавить в библиотеку</button>
+          <div class="side-note">Библиотека хранит задачи для повторного использования. Буфер хранит конкретные задачи для планирования.</div>
+        </section>
+        <footer class="sidebar-footer"><span id="storage-state" class="storage-state">проверка хранения</span><span class="muted">данные остаются в этом браузере</span></footer>
+      </aside>
+
+      <section class="planner" aria-label="Расписание недели">
+        <div class="planner-caption"><span>расписание · 06:00–23:00</span><span>шаг 30 минут</span></div>
+        <div class="calendar-viewport" id="calendar-viewport" tabindex="0" aria-label="Прокрутка плана по горизонтали">
+          <div class="calendar">
+            <div class="workdays">
+              <div id="workday-headings" class="workday-headings"></div>
+              <div class="workday-scroll" id="workday-scroll" tabindex="0" aria-label="Прокрутка расписания рабочих дней">
+                <div id="workday-grids" class="workday-grids"></div>
+              </div>
+            </div>
+            <div id="weekend" class="weekend"></div>
+          </div>
+        </div>
+        <p class="planner-footnote">Будни прокручиваются вместе. У субботы и воскресенья отдельные расписания.</p>
+      </section>
+    </div>
+  </main>
+
+  <dialog id="help-dialog" aria-labelledby="help-title">
+    <div class="dialog-heading"><h2 id="help-title">Как устроен планировщик</h2><button id="close-help" aria-label="Закрыть справку">закрыть</button></div>
+    <div class="help-content">
+      <h3>экран недели</h3>
+      <p>Неделя начинается в понедельник. Пять колонок отведены будням, шестая разделена на субботу и воскресенье. Время планирования: с 06:00 до 23:00.</p>
+      <h3>хранение данных</h3>
+      <p>Открывайте один и тот же файл в одном браузере. Очистка данных браузера может удалить задачи. Перемещение или переименование файла может изменить доступ к сохранённым данным.</p>
+      <p>Хранение локальных файлов зависит от браузера. Если сохранение недоступно, планировщик сообщит об этом. Для работы не нужен интернет.</p>
+      <h3>работа с задачами</h3>
+      <p>Создавайте задачи в буфере или нажатием на свободное время. Для переноса верните задачу в буфер и назначьте новый интервал. Галочка выполнения доступна только в плане. Из библиотеки и буфера задачи можно перетаскивать в расписание. В отчётах доступны просрочка и итоги недели.</p>
+      <p>Продолжайте редактирование в одной вкладке. Здесь нет регистрации, сервера и синхронизации между устройствами.</p>
+      <h3>сброс данных</h3><p>Удаляет библиотеку, задачи и настройки без возможности восстановления.</p><button id="help-reset">сбросить данные планировщика</button>
+    </div>
+  </dialog>
+  <dialog id="task-dialog" aria-labelledby="task-dialog-title">
+    <div class="dialog-heading"><h2 id="task-dialog-title">Задача</h2><button id="close-task" type="button">закрыть</button></div>
+    <form id="task-form" novalidate>
+      <label for="task-title">название</label><input id="task-title" maxlength="120" required aria-describedby="title-count title-error"><div class="field-meta"><span id="title-error" class="field-error"></span><span id="title-count">0 / 120</span></div>
+      <label for="task-description">описание</label><textarea id="task-description" maxlength="4000" rows="3" aria-describedby="description-count"></textarea><div class="field-meta"><span></span><span id="description-count">0 / 4000</span></div>
+      <div id="placement-group"><label for="task-placement">размещение</label><select id="task-placement"><option value="buffer">в буфер</option><option value="schedule">в расписание</option></select></div>
+      <div id="schedule-fields" class="field-grid" hidden>
+        <div><label for="task-date">дата планирования</label><input id="task-date" type="date" min="2000-01-01" max="2099-12-31"></div>
+        <div><label for="task-start">начало</label><select id="task-start"></select></div>
+        <div><label for="task-end">окончание</label><select id="task-end"></select></div>
+      </div>
+      <div id="duration-group"><label for="task-duration">длительность</label><select id="task-duration"></select></div>
+      <div id="deadline-group">
+        <label class="check-label"><input id="manual-deadline" type="checkbox"> отдельный срок</label>
+        <p class="muted">Без отдельного срока задача в расписании должна быть выполнена до конца дня планирования.</p>
+        <div id="deadline-choice-group" hidden><label for="deadline-choice">срок при переносе</label><select id="deadline-choice"><option value="">выберите действие</option><option value="keep">сохранить срок</option><option value="change">задать новый срок</option></select></div>
+        <div id="deadline-date-group" hidden><label for="task-deadline">дата срока</label><input id="task-deadline" type="date" min="2000-01-01" max="2099-12-31"></div>
+      </div>
+      <label id="add-to-library-label" class="check-label"><input id="add-to-library" type="checkbox"> добавить в библиотеку</label>
+      <p id="completed-info" class="muted" hidden></p><p id="placement-info" class="muted" hidden>Чтобы изменить день или начало, сначала верните задачу в буфер.</p>
+      <p id="form-error" class="field-error" role="alert"></p>
+      <div class="dialog-actions"><button type="submit" id="save-task" class="primary">сохранить</button><button id="cancel-task" type="button">отмена</button></div>
+      <div id="edit-actions" class="dialog-actions" hidden><button id="duplicate-task" type="button">дублировать</button><button id="return-task" type="button">вернуть в буфер</button><button id="delete-task" type="button" class="danger">удалить</button></div>
+    </form>
+  </dialog>
+  <dialog id="confirm-dialog" aria-labelledby="confirm-title"><h2 id="confirm-title">Подтверждение</h2><p id="confirm-copy"></p><p id="confirm-error" class="field-error" role="alert"></p><div class="dialog-actions"><button id="confirm-cancel">отмена</button><button id="confirm-accept" class="danger">удалить</button></div></dialog>
+  <dialog id="reset-dialog" aria-labelledby="reset-title"><h2 id="reset-title">Сброс данных планировщика</h2><p>Будут удалены библиотека, все задачи и настройки. Восстановить их нельзя.</p><label for="reset-word">для подтверждения введите «удалить»</label><input id="reset-word" autocomplete="off"><p id="reset-error" class="field-error" role="alert"></p><div class="dialog-actions"><button id="reset-cancel">отмена</button><button id="reset-accept" class="danger" disabled>удалить все данные</button></div></dialog>
+  <dialog id="reports-dialog" aria-labelledby="reports-title">
+    <div class="dialog-heading"><h2 id="reports-title">Отчёты</h2><button id="close-reports">закрыть</button></div>
+    <p id="report-week" class="muted"></p>
+    <div id="report-tabs" class="tabs" role="tablist" aria-label="Виды отчётов">
+      <button id="report-week-tab" role="tab" aria-selected="true" aria-controls="report-panel" data-report="week">просроченные за неделю</button>
+      <button id="report-all-tab" role="tab" aria-selected="false" aria-controls="report-panel" data-report="all" tabindex="-1">все просроченные</button>
+      <button id="report-summary-tab" role="tab" aria-selected="false" aria-controls="report-panel" data-report="summary" tabindex="-1">итоги недели</button>
+    </div>
+    <div id="report-panel" role="tabpanel" aria-labelledby="report-week-tab" tabindex="0"><div id="report-metrics"></div><p id="report-empty" hidden></p><div class="report-table-scroll"><table id="report-table"><thead id="report-head"></thead><tbody id="report-body"></tbody></table></div></div>
+  </dialog>
+  <noscript>Для работы планировщика включите JavaScript в браузере.</noscript>
+</body>
+</html>
